@@ -12,11 +12,18 @@ app.use(express.json());
 // --- BASİT IP TAKİP SİSTEMİ (Hafızada) ---
 const usageTracker = {}; // { "192.168.1.1": "2026-10-27" }
 
+// --- LİSANS TAKİP SİSTEMİ (IP Kilitleme) ---
+// { "LICENSE-KEY": { ips: Set(["1.1.1.1", "2.2.2.2"]), date: "2026-10-27", valid: true } }
+const licenseTracker = {}; 
+
 // --- AYARLAR ---
 const client = new OpenAI({
     apiKey: process.env.GROQ_API_KEY, // Şifreyi koddan değil, gizli kasadan al
     baseURL: "https://api.groq.com/openai/v1", // Groq Adresi
 });
+
+// Gumroad Ürün Permalink'i (Linkin sonundaki isim)
+const GUMROAD_PERMALINK = "extensionai";
 
 // İnsan gibi davranmak için bekleme fonksiyonu
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -165,6 +172,53 @@ async function generateSearchKeywords(intent) {
     }
 }
 
+// --- YENİ FONKSİYON: Lisans ve IP Kontrolü ---
+async function verifyLicenseAndIP(licenseKey, userIP) {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 1. Hafızada bu anahtar var mı?
+    if (!licenseTracker[licenseKey]) {
+        licenseTracker[licenseKey] = { ips: new Set(), date: today, valid: null };
+    }
+
+    const record = licenseTracker[licenseKey];
+
+    // Tarih değiştiyse IP listesini sıfırla (Yeni gün, yeni şans)
+    if (record.date !== today) {
+        record.date = today;
+        record.ips = new Set();
+    }
+
+    // 2. Anahtar daha önce doğrulanmamışsa Gumroad'a sor
+    if (record.valid === null) {
+        try {
+            console.log(`🔑 Gumroad Doğrulaması: ${licenseKey}`);
+            const response = await axios.post('https://api.gumroad.com/v2/licenses/verify', {
+                product_permalink: GUMROAD_PERMALINK,
+                license_key: licenseKey
+            });
+
+            if (response.data.success && !response.data.purchase.refunded) {
+                record.valid = true;
+            } else {
+                record.valid = false;
+                return { success: false, error: "Invalid or refunded license key." };
+            }
+        } catch (error) {
+            console.error("Gumroad API Hatası:", error.message);
+            return { success: false, error: "License verification failed." };
+        }
+    }
+
+    // 3. IP Kontrolü (Maksimum 3 farklı IP)
+    record.ips.add(userIP);
+    if (record.ips.size > 3) {
+        return { success: false, error: "License used on too many devices today (Max 3)." };
+    }
+
+    return { success: true };
+}
+
 // --- 2. FONKSİYON: AI Analizi Yap ---
 async function analyzeWithAI(marketData, userIntent, contextInfo) {
     const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight Chrome Extensions. ${contextInfo || ""} Your goal is to provide a brutally honest feasibility report.`;
@@ -257,12 +311,23 @@ app.post('/analyze', async (req, res) => {
         return res.status(400).json({ error: 'Intent/Keyword is required' });
     }
 
+    // Kullanıcının IP adresini al
+    const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
     // --- GÜVENLİK VE LİMİT KONTROLÜ ---
-    // Eğer geçerli bir lisans anahtarı YOKSA, IP kontrolü yap
-    if (!licenseKey) {
-        // Kullanıcının IP adresini al (Render/Proxy arkasında olduğu için x-forwarded-for)
-        const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    
+    if (licenseKey) {
+        // --- PRO KULLANICI KONTROLÜ ---
+        const verification = await verifyLicenseAndIP(licenseKey, userIP);
         
+        if (!verification.success) {
+            // Anahtar geçersizse veya IP limiti dolduysa hata ver
+            return res.status(403).json({ error: verification.error });
+        }
+        // Başarılıysa devam et (Limit yok)
+
+    } else {
+        // --- FREE KULLANICI KONTROLÜ ---
         // Bugünün tarihi (Sunucu saatiyle - UTC)
         const today = new Date().toISOString().split('T')[0]; // "2026-10-27"
 
