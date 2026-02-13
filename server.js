@@ -167,7 +167,7 @@ async function generateSearchKeywords(intent) {
 
 // --- 2. FONKSİYON: AI Analizi Yap ---
 async function analyzeWithAI(marketData, userIntent, contextInfo) {
-    const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight micro-SaaS extensions. ${contextInfo || ""} Your goal is to provide a brutally honest feasibility report.`;
+    const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight Chrome Extensions. ${contextInfo || ""} Your goal is to provide a brutally honest feasibility report.`;
     
     // Veriyi AI için metne döküyoruz
     const dataText = marketData.map((app, index) => `
@@ -186,7 +186,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
     If competitors are old (2024 or older) or have low ratings (< 4.0), this is a HUGE opportunity.
     
     LOGIC FOR ANALYSIS:
-    1. MUST-HAVES: Identify features present in almost ALL competitors. Even if it's very basic (e.g. "Counting tabs" for a Tab Manager), LIST IT. These are non-negotiable.
+    1. MUST-HAVES: Identify features present in almost ALL competitors. Even if it's very basic (e.g. "Counting tabs" for a Tab Manager), LIST IT. Do not arbitrarily limit the number of items; list ALL core features found.
     2. WEAKNESSES: Look for patterns. If the Market Leader (Highest Users) has a low rating or is old, their entire UX is a weakness. If one app has a feature but others don't, that's a "Gap" in the general market.
     Provide a strategic report in English with exactly these 4 sections.
     
@@ -218,7 +218,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
     <h3>3. COMPETITOR WEAKNESSES & GAPS</h3>
     <ul><li><strong>[Weakness/Gap]</strong>: [Explain (e.g. "Competitor X lacks this, causing user frustration")]</li></ul>
 
-    <h3>4. CREATIVE MICRO-SAAS IDEAS</h3>
+    <h3>4. CREATIVE EXTENSION IDEAS</h3>
     <ul><li><strong>[Innovative Feature]</strong>: [Description of functionality + User Benefit (e.g. "Auto-Sync: Saves data to cloud automatically so users never lose work.")]</li></ul>
     `;
 
