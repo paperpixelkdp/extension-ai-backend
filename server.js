@@ -9,6 +9,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- BASİT IP TAKİP SİSTEMİ (Hafızada) ---
+const usageTracker = {}; // { "192.168.1.1": "2026-10-27" }
+
 // --- AYARLAR ---
 const client = new OpenAI({
     apiKey: process.env.GROQ_API_KEY, // Şifreyi koddan değil, gizli kasadan al
@@ -132,9 +135,39 @@ async function scrapeChromeStore(keyword) {
     }
 }
 
+// --- YENİ FONKSİYON: Niyetten Anahtar Kelime Üret ---
+async function generateSearchKeywords(intent) {
+    const systemPrompt = "You are a Chrome Web Store search expert. Your goal is to convert user intent into effective search keywords to find existing competitors.";
+    const userPrompt = `
+    User Intent: "${intent}"
+    
+    Provide 3 distinct, short, and effective search queries that would find Chrome Extensions related to this intent.
+    Return ONLY a JSON array of strings. Example: ["keyword 1", "keyword 2", "keyword 3"]
+    Do not add any markdown or explanation.
+    `;
+    
+    try {
+        const completion = await client.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            temperature: 0.1,
+        });
+        
+        const content = completion.choices[0].message.content.trim();
+        const jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(jsonStr);
+    } catch (e) {
+        console.error("Keyword generation failed:", e);
+        return [intent]; // Hata olursa orijinal niyeti kullan
+    }
+}
+
 // --- 2. FONKSİYON: AI Analizi Yap ---
-async function analyzeWithAI(marketData) {
-    const systemPrompt = "You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight micro-SaaS extensions. You present your findings in a structured, high-density list format.";
+async function analyzeWithAI(marketData, userIntent, contextInfo) {
+    const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight micro-SaaS extensions. ${contextInfo || ""} Your goal is to provide a brutally honest feasibility report.`;
     
     // Veriyi AI için metne döküyoruz
     const dataText = marketData.map((app, index) => `
@@ -144,47 +177,49 @@ async function analyzeWithAI(marketData) {
     `).join("\n----------------\n");
 
     const userPrompt = `
-    I am planning to build a Chrome Extension in this niche.
+    User Intent: "${userIntent}"
     Here is the raw description data of the TOP 5 COMPETITORS I scraped from the store:
 
     ${dataText}
 
-    Analyze this data deeply. Use the STATS (Users & Rating) to find opportunities (e.g. High Users + Low Rating = GAP).
-    Provide a strategic report in English with exactly these 5 sections.
+    Analyze this data deeply. Focus on the "Last Updated" dates (Current Year is 2026), "Ratings", and "User Counts".
+    If competitors are old (2024 or older) or have low ratings (< 4.0), this is a HUGE opportunity.
+    
+    LOGIC FOR ANALYSIS:
+    1. MUST-HAVES: Identify features present in almost ALL competitors. Even if it's very basic (e.g. "Counting tabs" for a Tab Manager), LIST IT. These are non-negotiable.
+    2. WEAKNESSES: Look for patterns. If the Market Leader (Highest Users) has a low rating or is old, their entire UX is a weakness. If one app has a feature but others don't, that's a "Gap" in the general market.
+    Provide a strategic report in English with exactly these 4 sections.
     
     IMPORTANT: Format your response as raw HTML code (without \`\`\`html tags). 
     Do not use markdown symbols like ** or ##. 
-    Use <h3> for section titles.
+    Use <h3> for section titles (e.g. <h3>1. MARKET FEASIBILITY & VERDICT</h3>).
     Use <ul> and <li> for ALL content to make it scannable like a data table.
     Do not use quotation marks ("") around the text.
     
     CRITICAL INSTRUCTIONS:
-    - First, identify the specific niche based on the competitor data (e.g. SEO, Productivity, Crypto, etc.).
-    - Avoid generic terms like "User Interface", "Good Design", or "Compatibility".
-    - Be SPECIFIC to that niche.
-      - Example: If it's a "Color Picker", suggest "Hex/RGB Converter". If "Note Taker", suggest "Markdown Support".
-    - In GAPS, mention specific missing functionalities relevant to this niche.
-    - In OPPORTUNITIES, propose concrete Micro-SaaS features that solve specific pain points in this niche.
+    1. FEASIBILITY: Give a score (0-100). If competitors are old/bad, score high. If they are perfect, score low. 
+       - **Reasoning MUST cite specific data**: "Enter because average rating is 3.2 and top competitor hasn't updated since 2023."
+    2. MUST-HAVE: List the CORE features. Don't skip the basics. Explain WHY it's needed.
+    3. WEAKNESSES: Focus on what the MARKET LEADERS are missing or doing poorly.
+    4. CREATIVE IDEAS: Suggest unique, innovative features that NO competitor has. 
+       - **Format**: [Feature Name]: [Clear explanation of what it does and the benefit].
     
     Structure:
-    <h3>1. COMPETITOR DATA MATRIX</h3> 
-    <ul><li><strong>[Name]</strong>: [Stats] - [Core Focus/Strategy]</li></ul>
-
-    <h3>2. COMMON FEATURE BASELINE</h3> 
-    <ul><li><strong>[Specific Feature/UI]</strong>: [Why it is standard in this niche]</li></ul>
-
-    <h3>3. DETECTED GAPS & WEAKNESSES</h3> 
-    <ul><li><strong>[Specific Missing Feature/UX Flaw]</strong>: [Why users hate this]</li></ul>
-
-    <h3>4. STRATEGIC OPPORTUNITIES (Micro-SaaS)</h3> 
-    <ul><li><strong>[Concrete Feature Idea]</strong>: [How it solves a pain point]</li></ul>
-
-    <h3>5. RECOMMENDED TECH STACK (Low Cost)</h3> 
+    <h3>1. MARKET FEASIBILITY & VERDICT</h3>
     <ul>
-        <li><strong>Storage</strong>: [Recommendation (e.g. LocalStorage)]</li>
-        <li><strong>Frontend</strong>: [Recommendation]</li>
-        <li><strong>Backend</strong>: [Recommendation (or None)]</li>
+        <li><strong>Score</strong>: [0-100]/100</li>
+        <li><strong>Verdict</strong>: [ENTER / AVOID / CAUTION]</li>
+        <li><strong>Reasoning</strong>: [Convince the user with DATA. Mention specific User Counts, Ratings, and Dates found in the analysis.]</li>
     </ul>
+
+    <h3>2. MUST-HAVE FEATURES (Baseline)</h3>
+    <ul><li><strong>[Core Feature]</strong>: [Explanation (e.g. "Essential for basic functionality")]</li></ul>
+
+    <h3>3. COMPETITOR WEAKNESSES & GAPS</h3>
+    <ul><li><strong>[Weakness/Gap]</strong>: [Explain (e.g. "Competitor X lacks this, causing user frustration")]</li></ul>
+
+    <h3>4. CREATIVE MICRO-SAAS IDEAS</h3>
+    <ul><li><strong>[Innovative Feature]</strong>: [Description of functionality + User Benefit (e.g. "Auto-Sync: Saves data to cloud automatically so users never lose work.")]</li></ul>
     `;
 
     const completion = await client.chat.completions.create({
@@ -199,20 +234,61 @@ async function analyzeWithAI(marketData) {
     return completion.choices[0].message.content;
 }
 
+// --- YENİ ENDPOINT: Keyword Üretme ---
+app.post('/get-keywords', async (req, res) => {
+    const { intent } = req.body;
+    if (!intent) return res.status(400).json({ error: 'Intent is required' });
+    
+    try {
+        const keywords = await generateSearchKeywords(intent);
+        res.json({ keywords });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // --- API ENDPOINT ---
 app.post('/analyze', async (req, res) => {
-    const { keyword } = req.body;
+    // Frontend'den gelen zengin veriyi alıyoruz
+    const { keyword, intent, marketData, context, licenseKey } = req.body;
+    const targetIntent = intent || keyword;
     
-    if (!keyword) {
-        return res.status(400).json({ error: 'Keyword is required' });
+    if (!targetIntent) {
+        return res.status(400).json({ error: 'Intent/Keyword is required' });
+    }
+
+    // --- GÜVENLİK VE LİMİT KONTROLÜ ---
+    // Eğer geçerli bir lisans anahtarı YOKSA, IP kontrolü yap
+    if (!licenseKey) {
+        // Kullanıcının IP adresini al (Render/Proxy arkasında olduğu için x-forwarded-for)
+        const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        
+        // Bugünün tarihi (Sunucu saatiyle - UTC)
+        const today = new Date().toISOString().split('T')[0]; // "2026-10-27"
+
+        // Bu IP bugün işlem yapmış mı?
+        if (usageTracker[userIP] === today) {
+            return res.status(429).json({ 
+                error: 'DAILY_LIMIT_REACHED', 
+                message: 'Free daily limit reached. Please upgrade to PRO.' 
+            });
+        }
+
+        // İşlem yapmadıysa bugüne kaydet
+        usageTracker[userIP] = today;
     }
 
     try {
-        // 1. Veriyi Çek
-        const data = await scrapeChromeStore(keyword);
+        // 1. Veri Kaynağını Belirle
+        // Eğer frontend (popup.js) veriyi tarayıp gönderdiyse onu kullan.
+        // Göndermediyse (eski sürümse) sunucu kendisi tarasın (Fallback).
+        let data = marketData;
+        if (!data || data.length === 0) {
+            data = await scrapeChromeStore(targetIntent);
+        }
         
-        // 2. AI Analizi Yap
-        const analysis = await analyzeWithAI(data);
+        // 2. AI Analizi Yap (Niyet ve Bağlam ile)
+        const analysis = await analyzeWithAI(data, targetIntent, context);
 
         // 3. Sonucu Gönder
         res.json({ 
