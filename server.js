@@ -236,7 +236,7 @@ async function verifyLicenseAndIP(licenseKey, userIP) {
 
 // --- 2. FONKSİYON: AI Analizi Yap ---
 async function analyzeWithAI(marketData, userIntent, contextInfo) {
-    const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight Chrome Extensions. ${contextInfo || ""} Your goal is to provide a brutally honest feasibility report.`;
+    const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight Chrome Extensions. ${contextInfo || ""} Your goal is to provide a BRUTALLY HONEST and CRITICAL feasibility report. Do not be overly optimistic.`;
     
     // Veriyi AI için metne döküyoruz
     const dataText = marketData.map((app, index) => `
@@ -252,8 +252,10 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
     ${dataText}
 
     Analyze this data deeply. Focus on the "Last Updated" dates (Current Year is 2026), "Ratings", and "User Counts".
-    If competitors are old (2024 or older) or have low ratings (< 4.0), this is a HUGE opportunity.
     
+    BE CAREFUL: If the niche is technically very hard (like "Video Editor", "Photoshop", "3D"), LOWER the score even if competitors are bad, because building a good product is difficult.
+    If competitors are old (2024 or older) or have low ratings (< 4.0), this is generally an opportunity, but consider the technical complexity.
+
     LOGIC FOR ANALYSIS:
     1. MUST-HAVES: Identify features present in almost ALL competitors. Even if it's very basic (e.g. "Counting tabs" for a Tab Manager), LIST IT. Do not arbitrarily limit the number of items; list ALL core features found.
     2. WEAKNESSES: Look for patterns. If the Market Leader (Highest Users) has a low rating or is old, their entire UX is a weakness. If one app has a feature but others don't, that's a "Gap" in the general market.
