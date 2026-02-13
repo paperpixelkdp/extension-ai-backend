@@ -22,8 +22,8 @@ const client = new OpenAI({
     baseURL: "https://api.groq.com/openai/v1", // Groq Adresi
 });
 
-// Gumroad Ürün Permalink'i (Linkin sonundaki isim)
-const GUMROAD_PERMALINK = "extensionai";
+// Gumroad Ürün ID'si (Popup.js ile aynı ve en güvenli yöntem)
+const GUMROAD_PRODUCT_ID = "j4fE4mjv53egToZOJ0d-0w==";
 
 // İnsan gibi davranmak için bekleme fonksiyonu
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -197,7 +197,7 @@ async function verifyLicenseAndIP(licenseKey, userIP) {
             // DÜZELTME: JSON yerine Form Data kullanıyoruz (Popup ile aynı yöntem)
             // Ayrıca 'increment_uses_count: false' diyerek lisans hakkını yemiyoruz.
             const params = new URLSearchParams();
-            params.append('product_permalink', GUMROAD_PERMALINK);
+            params.append('product_id', GUMROAD_PRODUCT_ID); // Permalink yerine ID kullanıyoruz
             params.append('license_key', licenseKey);
             params.append('increment_uses_count', 'false');
 
@@ -218,7 +218,10 @@ async function verifyLicenseAndIP(licenseKey, userIP) {
             if (error.response && error.response.status === 404) {
                 return { success: false, error: "License check failed: Product not found (Check Permalink)." };
             }
-            return { success: false, error: "License verification failed." };
+            
+            // Gerçek hatayı döndürelim ki ne olduğunu görelim
+            const errorMsg = error.response && error.response.data && error.response.data.message ? error.response.data.message : "License verification failed.";
+            return { success: false, error: errorMsg };
         }
     }
 
