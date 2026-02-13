@@ -193,9 +193,16 @@ async function verifyLicenseAndIP(licenseKey, userIP) {
     if (record.valid === null) {
         try {
             console.log(`🔑 Gumroad Doğrulaması: ${licenseKey}`);
-            const response = await axios.post('https://api.gumroad.com/v2/licenses/verify', {
-                product_permalink: GUMROAD_PERMALINK,
-                license_key: licenseKey
+            
+            // DÜZELTME: JSON yerine Form Data kullanıyoruz (Popup ile aynı yöntem)
+            // Ayrıca 'increment_uses_count: false' diyerek lisans hakkını yemiyoruz.
+            const params = new URLSearchParams();
+            params.append('product_permalink', GUMROAD_PERMALINK);
+            params.append('license_key', licenseKey);
+            params.append('increment_uses_count', 'false');
+
+            const response = await axios.post('https://api.gumroad.com/v2/licenses/verify', params.toString(), {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
             });
 
             if (response.data.success && !response.data.purchase.refunded) {
@@ -205,7 +212,12 @@ async function verifyLicenseAndIP(licenseKey, userIP) {
                 return { success: false, error: "Invalid or refunded license key." };
             }
         } catch (error) {
-            console.error("Gumroad API Hatası:", error.message);
+            // Hata detayını konsola yazdıralım (404 gelirse permalink yanlıştır)
+            console.error("Gumroad API Hatası:", error.response ? error.response.data : error.message);
+            
+            if (error.response && error.response.status === 404) {
+                return { success: false, error: "License check failed: Product not found (Check Permalink)." };
+            }
             return { success: false, error: "License verification failed." };
         }
     }
