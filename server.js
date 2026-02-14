@@ -25,7 +25,7 @@ const client = new OpenAI({
 // Gumroad Ürünleri (ID veya Permalink kabul eder - Çilingir Listesi)
 const ALLOWED_PRODUCTS = [
     { type: 'id', value: "j4fE4mjv53egToZOJ0d-0w==" },          // 1. Mevcut Pro (Uygulama İçi)
-    { type: 'permalink', value: "extension-ai-early-access" }   // 2. Yeni Early Access (Senin verdiğin link)
+    { type: 'id', value: "1AawbK5gNT_7rJIPe4WnEw==" }           // 2. Yeni Early Access (Gumroad'ın verdiği ID)
 ];
 
 // İnsan gibi davranmak için bekleme fonksiyonu
