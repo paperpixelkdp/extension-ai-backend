@@ -22,8 +22,11 @@ const client = new OpenAI({
     baseURL: "https://api.groq.com/openai/v1", // Groq Adresi
 });
 
-// Gumroad Ürün ID'si (Popup.js ile aynı ve en güvenli yöntem)
-const GUMROAD_PRODUCT_ID = "j4fE4mjv53egToZOJ0d-0w==";
+// Gumroad Ürünleri (ID veya Permalink kabul eder - Çilingir Listesi)
+const ALLOWED_PRODUCTS = [
+    { type: 'id', value: "j4fE4mjv53egToZOJ0d-0w==" },          // 1. Mevcut Pro (Uygulama İçi)
+    { type: 'permalink', value: "extension-ai-early-access" }   // 2. Yeni Early Access (Senin verdiğin link)
+];
 
 // İnsan gibi davranmak için bekleme fonksiyonu
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -191,37 +194,41 @@ async function verifyLicenseAndIP(licenseKey, userIP) {
 
     // 2. Anahtar daha önce doğrulanmamışsa Gumroad'a sor
     if (record.valid === null) {
-        try {
-            console.log(`🔑 Gumroad Doğrulaması: ${licenseKey}`);
-            
-            // DÜZELTME: JSON yerine Form Data kullanıyoruz (Popup ile aynı yöntem)
-            // Ayrıca 'increment_uses_count: false' diyerek lisans hakkını yemiyoruz.
-            const params = new URLSearchParams();
-            params.append('product_id', GUMROAD_PRODUCT_ID); // Permalink yerine ID kullanıyoruz
-            params.append('license_key', licenseKey);
-            params.append('increment_uses_count', 'false');
+        let isValid = false;
+        console.log(`🔑 Gumroad Doğrulaması Başlıyor: ${licenseKey}`);
 
-            const response = await axios.post('https://api.gumroad.com/v2/licenses/verify', params.toString(), {
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-            });
+        // Tüm tanımlı ürünleri sırayla dene
+        for (const product of ALLOWED_PRODUCTS) {
+            try {
+                const params = new URLSearchParams();
+                // ID ise 'product_id', Link ise 'product_permalink' parametresini kullan
+                if (product.type === 'id') {
+                    params.append('product_id', product.value);
+                } else {
+                    params.append('product_permalink', product.value);
+                }
+                params.append('license_key', licenseKey);
+                params.append('increment_uses_count', 'false');
 
-            if (response.data.success && !response.data.purchase.refunded) {
-                record.valid = true;
-            } else {
-                record.valid = false;
-                return { success: false, error: "Invalid or refunded license key." };
+                const response = await axios.post('https://api.gumroad.com/v2/licenses/verify', params.toString(), {
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                });
+
+                if (response.data.success && !response.data.purchase.refunded) {
+                    isValid = true;
+                    console.log(`✅ Doğrulama Başarılı! (Ürün: ${product.value})`);
+                    break; // Bulduk, döngüden çık
+                }
+            } catch (error) {
+                // Bu ürünle eşleşmedi, sessizce diğerini dene
             }
-        } catch (error) {
-            // Hata detayını konsola yazdıralım (404 gelirse permalink yanlıştır)
-            console.error("Gumroad API Hatası:", error.response ? error.response.data : error.message);
-            
-            if (error.response && error.response.status === 404) {
-                return { success: false, error: "License check failed: Product not found (Check Permalink)." };
-            }
-            
-            // Gerçek hatayı döndürelim ki ne olduğunu görelim
-            const errorMsg = error.response && error.response.data && error.response.data.message ? error.response.data.message : "License verification failed.";
-            return { success: false, error: errorMsg };
+        }
+
+        if (isValid) {
+            record.valid = true;
+        } else {
+            record.valid = false;
+            return { success: false, error: "Invalid license key." };
         }
     }
 
