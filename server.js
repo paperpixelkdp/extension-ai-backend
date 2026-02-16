@@ -50,7 +50,7 @@ async function scrapeChromeStore(keyword) {
         });
 
         // Aday havuzunu genişletiyoruz
-        const candidateLinks = Array.from(uniqueLinks).slice(0, 10);
+        const candidateLinks = Array.from(uniqueLinks).slice(0, 20);
         
         if (candidateLinks.length === 0) {
             console.log("⚠️ Arama sonucunda eklenti bulunamadı.");
@@ -66,7 +66,7 @@ async function scrapeChromeStore(keyword) {
 
         // Her bir rakibi gez
         for (const link of candidateLinks) {
-            if (marketData.length >= 5) break; // 5 tane temiz rakip bulduysak yeter
+            if (marketData.length >= 15) break; // LİMİT ARTIRILDI: 15 Rakip
 
             console.log(`➡️ İnceleniyor: ${link}`);
             
@@ -88,8 +88,8 @@ async function scrapeChromeStore(keyword) {
                 // Verileri Ayrıştır (Sadece Açıklama ve Yorumlar odaklı)
                 const name = $$('h1').text().trim() || "Unknown";
                 // Önce tam açıklamayı (itemprop) dene, yoksa meta etiketindeki özeti al
-                // DÜZELTME: Meta tag yerine DIV arıyoruz
-                const description = $$('div[itemprop="description"]').text().trim() || 
+                // DÜZELTME: Meta etiketi OLMAYAN asıl açıklama bloğunu bul
+                const description = $$('[itemprop="description"]:not(meta)').text().trim() || 
                                     $$('.C7k78').text().trim() || 
                                     $$('meta[property="og:description"]').attr('content') || 
                                     $$('.TZFoid').text() || ""; 
