@@ -117,7 +117,7 @@ async function scrapeChromeStore(keyword) {
                 // --- YENİ: Son Güncelleme Tarihi (Updated) ---
                 let lastUpdated = "Unknown";
                 // "Updated" yazan div'i bul ve bir sonraki kardeş elementin (tarihin) metnini al
-                const updatedLabel = $$('div').filter((i, el) => $$(el).text().trim() === 'Updated').first();
+                const updatedLabel = $$('div, span, li').filter((i, el) => $$(el).text().trim() === 'Updated').first();
                 if (updatedLabel.length > 0) {
                     lastUpdated = updatedLabel.next().text().trim();
                 }
