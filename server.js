@@ -86,10 +86,13 @@ async function scrapeChromeStore(keyword) {
                 const $$ = cheerio.load(detailHtml);
 
                 // Verileri Ayrıştır (Sadece Açıklama ve Yorumlar odaklı)
-                const name = $$('h1').text().trim() || "Unknown";
+                // DÜZELTME: Yeni tasarım sınıfları (.Pa2dE) eklendi
+                const name = $$('.Pa2dE').text().trim() || $$('h1').text().trim() || "Unknown";
+                
                 // Önce tam açıklamayı (itemprop) dene, yoksa meta etiketindeki özeti al
-                // DÜZELTME: Meta etiketi OLMAYAN asıl açıklama bloğunu bul
-                const description = $$('[itemprop="description"]:not(meta)').text().trim() || 
+                // DÜZELTME: .mN52G sınıfı (Yeni Tasarım) en başa eklendi
+                const description = $$('.mN52G').text().trim() || 
+                                    $$('[itemprop="description"]:not(meta)').text().trim() || 
                                     $$('.C7k78').text().trim() || 
                                     $$('meta[property="og:description"]').attr('content') || 
                                     $$('.TZFoid').text() || ""; 
@@ -101,13 +104,15 @@ async function scrapeChromeStore(keyword) {
                 let rating = "N/A";
                 let users = "N/A";
 
-                // Puanı bul (Örn: "4.5 out of 5" veya "4,5/5")
-                const ratingMatch = fullText.match(/(\d[\.,]\d)\s*(out of 5|\/5)/);
-                if (ratingMatch) rating = ratingMatch[1];
+                // DÜZELTME: Puan için .Vq0ZA sınıfı
+                const ratingEl = $$('.Vq0ZA').first().text().trim();
+                if (ratingEl) rating = ratingEl;
+                else { const m = fullText.match(/(\d[\.,]\d)\s*(out of 5|\/5)/); if(m) rating = m[1]; }
 
-                // Kullanıcı sayısını bul (Örn: "10,000+ users" veya "2.000+ kullanıcı")
-                const usersMatch = fullText.match(/([\d,\.]+\+?)\s*(users|kullanıcı)/i);
-                if (usersMatch) users = usersMatch[1];
+                // DÜZELTME: Kullanıcı sayısı için .F9iKBc sınıfı
+                const usersEl = $$('.F9iKBc').text().trim();
+                if (usersEl) { const m = usersEl.match(/([\d,\.]+\+?)\s*(users|kullanıcı)/i); if(m) users = m[1]; }
+                else { const m = fullText.match(/([\d,\.]+\+?)\s*(users|kullanıcı)/i); if(m) users = m[1]; }
                 
                 // --- FİLTRELEME: Başlık aranan kelimeyi içeriyor mu? ---
                 const nameLower = name.toLowerCase();
