@@ -9,24 +9,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- BASİT IP TAKİP SİSTEMİ (Hafızada) ---
-const usageTracker = {}; // { "192.168.1.1": "2026-10-27" }
-
-// --- LİSANS TAKİP SİSTEMİ (IP Kilitleme) ---
-// { "LICENSE-KEY": { ips: Set(["1.1.1.1", "2.2.2.2"]), date: "2026-10-27", valid: true } }
-const licenseTracker = {}; 
-
 // --- AYARLAR ---
 const client = new OpenAI({
     apiKey: process.env.GROQ_API_KEY, // Şifreyi koddan değil, gizli kasadan al
     baseURL: "https://api.groq.com/openai/v1", // Groq Adresi
 });
-
-// Gumroad Ürünleri (ID veya Permalink kabul eder - Çilingir Listesi)
-const ALLOWED_PRODUCTS = [
-    { type: 'id', value: "j4fE4mjv53egToZOJ0d-0w==" },          // 1. Mevcut Pro (Uygulama İçi)
-    { type: 'id', value: "1AawbK5gNT_7rJIPe4WnEw==" }           // 2. Yeni Early Access (Gumroad'ın verdiği ID)
-];
 
 // İnsan gibi davranmak için bekleme fonksiyonu
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -100,7 +87,10 @@ async function scrapeChromeStore(keyword) {
 
                 // Verileri Ayrıştır (Sadece Açıklama ve Yorumlar odaklı)
                 const name = $$('h1').text().trim() || "Unknown";
-                const description = $$('meta[property="og:description"]').attr('content') || $$('.TZFoid').text() || ""; // Farklı classlar deniyoruz
+                // Önce tam açıklamayı (itemprop) dene, yoksa meta etiketindeki özeti al
+                const description = $$('[itemprop="description"]').text().trim() || 
+                                    $$('meta[property="og:description"]').attr('content') || 
+                                    $$('.TZFoid').text() || ""; 
                 
                 // --- YENİ ÖZELLİK: Puan ve Kullanıcı Sayısı Avcılığı ---
                 const fullText = $$('body').text();
@@ -173,72 +163,6 @@ async function generateSearchKeywords(intent) {
         console.error("Keyword generation failed:", e);
         return [intent]; // Hata olursa orijinal niyeti kullan
     }
-}
-
-// --- YENİ FONKSİYON: Lisans ve IP Kontrolü ---
-async function verifyLicenseAndIP(licenseKey, userIP) {
-    const today = new Date().toISOString().split('T')[0];
-    
-    // 1. Hafızada bu anahtar var mı?
-    if (!licenseTracker[licenseKey]) {
-        licenseTracker[licenseKey] = { ips: new Set(), date: today, valid: null };
-    }
-
-    const record = licenseTracker[licenseKey];
-
-    // Tarih değiştiyse IP listesini sıfırla (Yeni gün, yeni şans)
-    if (record.date !== today) {
-        record.date = today;
-        record.ips = new Set();
-    }
-
-    // 2. Anahtar daha önce doğrulanmamışsa Gumroad'a sor
-    if (record.valid === null) {
-        let isValid = false;
-        console.log(`🔑 Gumroad Doğrulaması Başlıyor: ${licenseKey}`);
-
-        // Tüm tanımlı ürünleri sırayla dene
-        for (const product of ALLOWED_PRODUCTS) {
-            try {
-                const params = new URLSearchParams();
-                // ID ise 'product_id', Link ise 'product_permalink' parametresini kullan
-                if (product.type === 'id') {
-                    params.append('product_id', product.value);
-                } else {
-                    params.append('product_permalink', product.value);
-                }
-                params.append('license_key', licenseKey);
-                params.append('increment_uses_count', 'false');
-
-                const response = await axios.post('https://api.gumroad.com/v2/licenses/verify', params.toString(), {
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                });
-
-                if (response.data.success && !response.data.purchase.refunded) {
-                    isValid = true;
-                    console.log(`✅ Doğrulama Başarılı! (Ürün: ${product.value})`);
-                    break; // Bulduk, döngüden çık
-                }
-            } catch (error) {
-                // Bu ürünle eşleşmedi, sessizce diğerini dene
-            }
-        }
-
-        if (isValid) {
-            record.valid = true;
-        } else {
-            record.valid = false;
-            return { success: false, error: "Invalid license key." };
-        }
-    }
-
-    // 3. IP Kontrolü (Maksimum 3 farklı IP)
-    record.ips.add(userIP);
-    if (record.ips.size > 3) {
-        return { success: false, error: "License used on too many devices today (Max 3)." };
-    }
-
-    return { success: true };
 }
 
 // --- 2. FONKSİYON: AI Analizi Yap ---
@@ -328,43 +252,11 @@ app.post('/get-keywords', async (req, res) => {
 // --- API ENDPOINT ---
 app.post('/analyze', async (req, res) => {
     // Frontend'den gelen zengin veriyi alıyoruz
-    const { keyword, intent, marketData, context, licenseKey } = req.body;
+    const { keyword, intent, marketData, context } = req.body;
     const targetIntent = intent || keyword;
     
     if (!targetIntent) {
         return res.status(400).json({ error: 'Intent/Keyword is required' });
-    }
-
-    // Kullanıcının IP adresini al
-    const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-
-    // --- GÜVENLİK VE LİMİT KONTROLÜ ---
-    
-    if (licenseKey) {
-        // --- PRO KULLANICI KONTROLÜ ---
-        const verification = await verifyLicenseAndIP(licenseKey, userIP);
-        
-        if (!verification.success) {
-            // Anahtar geçersizse veya IP limiti dolduysa hata ver
-            return res.status(403).json({ error: verification.error });
-        }
-        // Başarılıysa devam et (Limit yok)
-
-    } else {
-        // --- FREE KULLANICI KONTROLÜ ---
-        // Bugünün tarihi (Sunucu saatiyle - UTC)
-        const today = new Date().toISOString().split('T')[0]; // "2026-10-27"
-
-        // Bu IP bugün işlem yapmış mı?
-        if (usageTracker[userIP] === today) {
-            return res.status(429).json({ 
-                error: 'DAILY_LIMIT_REACHED', 
-                message: 'Free daily limit reached. Please upgrade to PRO.' 
-            });
-        }
-
-        // İşlem yapmadıysa bugüne kaydet
-        usageTracker[userIP] = today;
     }
 
     try {
