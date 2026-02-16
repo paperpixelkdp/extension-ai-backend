@@ -92,6 +92,8 @@ async function scrapeChromeStore(keyword) {
                                     $$('meta[property="og:description"]').attr('content') || 
                                     $$('.TZFoid').text() || ""; 
                 
+                console.log(`📄 ${name} -> Okunan Açıklama: ${description.length} karakter`);
+
                 // --- YENİ ÖZELLİK: Puan ve Kullanıcı Sayısı Avcılığı ---
                 const fullText = $$('body').text();
                 let rating = "N/A";
