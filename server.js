@@ -176,7 +176,7 @@ async function generateSearchKeywords(intent) {
 
 // --- 2. FONKSİYON: AI Analizi Yap ---
 async function analyzeWithAI(marketData, userIntent, contextInfo) {
-    const systemPrompt = `You are an expert Indie Hacker and Chrome Extension Developer. You analyze markets to find gaps for profitable, lightweight Chrome Extensions. ${contextInfo || ""} Your goal is to provide a BRUTALLY HONEST and CRITICAL feasibility report. Do not be overly optimistic.`;
+    const systemPrompt = `You are a cynical, strict Venture Capitalist and Software Auditor. You HATE losing money. Your default stance is "NO" unless proven otherwise. You analyze Chrome Extension markets for a SOLO DEVELOPER with limited budget. ${contextInfo || ""} Your goal is to find reasons NOT to build this. Be harsh. Be critical. Do not be polite.`;
     
     // Veriyi AI için metne döküyoruz
     const dataText = marketData.map((app, index) => `
@@ -193,12 +193,17 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
 
     Analyze this data deeply. Focus on the "Last Updated" dates (Current Year is 2026), "Ratings", and "User Counts".
     
-    BE CAREFUL: If the niche is technically very hard (like "Video Editor", "Photoshop", "3D"), LOWER the score even if competitors are bad, because building a good product is difficult.
-    If competitors are old (2024 or older) or have low ratings (< 4.0), this is generally an opportunity, but consider the technical complexity.
+    STRICT SCORING RULES (Follow these or you fail):
+    1. SATURATION KILLER: If you see ANY competitor with 100,000+ users and a 4.5+ rating, the Score MUST be below 40. Verdict MUST be "AVOID". The market is taken.
+    2. DOMINANCE CHECK: If there are 3+ competitors with 10,000+ users and good ratings (>4.2), Score MUST be below 60. Verdict: "CAUTION".
+    3. TECHNICAL TRAP: If the idea requires complex tech (Video editing, AI processing, 3D), penalize the score by -20 points. We are a solo dev.
+    4. THE OPPORTUNITY: Only give a score above 75 IF competitors are old (not updated since 2024), broken (ratings < 3.5), or non-existent.
 
     LOGIC FOR ANALYSIS:
-    1. MUST-HAVES: Identify features present in almost ALL competitors. Even if it's very basic (e.g. "Counting tabs" for a Tab Manager), LIST IT. Do not arbitrarily limit the number of items; list ALL core features found.
-    2. WEAKNESSES: Look for patterns. If the Market Leader (Highest Users) has a low rating or is old, their entire UX is a weakness. If one app has a feature but others don't, that's a "Gap" in the general market.
+    1. FEASIBILITY: Start with a low score. Only increase it if you find a GAP.
+    2. MUST-HAVES: List features that are absolutely required to even compete.
+    3. WEAKNESSES: Roast the competitors. Are they ugly? Old? Broken? Expensive?
+    
     Provide a strategic report in English with exactly these 4 sections.
     
     IMPORTANT: Format your response as raw HTML code (without \`\`\`html tags). 
@@ -209,7 +214,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
     
     CRITICAL INSTRUCTIONS:
     1. FEASIBILITY: Give a score (0-100). If competitors are old/bad, score high. If they are perfect, score low. 
-       - **Reasoning MUST cite specific data**: "Enter because average rating is 3.2 and top competitor hasn't updated since 2023."
+       - **Reasoning MUST cite specific data**: "AVOID because 'Competitor X' has 2M users and 4.8 rating. You cannot beat them."
     2. MUST-HAVE: List the CORE features. Don't skip the basics. Explain WHY it's needed.
     3. WEAKNESSES: Focus on what the MARKET LEADERS are missing or doing poorly.
     4. CREATIVE IDEAS: Suggest unique, innovative features that NO competitor has. 
@@ -218,7 +223,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
     Structure:
     <h3>1. MARKET FEASIBILITY & VERDICT</h3>
     <ul>
-        <li><strong>Score</strong>: [0-100]/100</li>
+        <li><strong>Score</strong>: [0-100]/100 (Be harsh!)</li>
         <li><strong>Verdict</strong>: [ENTER / AVOID / CAUTION]</li>
         <li><strong>Reasoning</strong>: [Convince the user with DATA. Mention specific User Counts, Ratings, and Dates found in the analysis.]</li>
     </ul>
