@@ -113,6 +113,14 @@ async function scrapeChromeStore(keyword) {
                 const usersEl = $$('.F9iKBc').text().trim();
                 if (usersEl) { const m = usersEl.match(/([\d,\.]+\+?)\s*(users|kullanıcı)/i); if(m) users = m[1]; }
                 else { const m = fullText.match(/([\d,\.]+\+?)\s*(users|kullanıcı)/i); if(m) users = m[1]; }
+
+                // --- YENİ: Son Güncelleme Tarihi (Updated) ---
+                let lastUpdated = "Unknown";
+                // "Updated" yazan div'i bul ve bir sonraki kardeş elementin (tarihin) metnini al
+                const updatedLabel = $$('div').filter((i, el) => $$(el).text().trim() === 'Updated').first();
+                if (updatedLabel.length > 0) {
+                    lastUpdated = updatedLabel.next().text().trim();
+                }
                 
                 // --- FİLTRELEME: Başlık aranan kelimeyi içeriyor mu? ---
                 const nameLower = name.toLowerCase();
@@ -124,7 +132,8 @@ async function scrapeChromeStore(keyword) {
                         name: name,
                         description: description.substring(0, 2000),
                         rating: rating,
-                        users: users
+                        users: users,
+                        lastUpdated: lastUpdated
                     });
                     console.log(`✅ Eklendi: ${name}`);
                 } else {
@@ -181,7 +190,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
     // Veriyi AI için metne döküyoruz
     const dataText = marketData.map((app, index) => `
     [COMPETITOR ${index + 1}]: ${app.name}
-    STATS: ${app.users} users | ${app.rating} stars (out of 5)
+    STATS: ${app.users} users | ${app.rating} stars | Last Updated: ${app.lastUpdated || "Unknown"}
     DESCRIPTION/FEATURES: ${app.description}
     `).join("\n----------------\n");
 
