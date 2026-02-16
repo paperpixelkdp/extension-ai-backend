@@ -200,7 +200,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
 
     ${dataText}
 
-    Analyze this data deeply. Focus on the "Last Updated" dates (Current Year is 2026), "Ratings", and "User Counts".
+    Analyze this data deeply. Focus on the "Last Updated" dates (Current Date is ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}), "Ratings", and "User Counts".
     
     STRICT SCORING RULES (Follow these or you fail):
     1. SATURATION KILLER: If you see ANY competitor with 100,000+ users and a 4.5+ rating, the Score MUST be below 40. Verdict MUST be "AVOID". The market is taken.
