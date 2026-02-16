@@ -88,7 +88,9 @@ async function scrapeChromeStore(keyword) {
                 // Verileri Ayrıştır (Sadece Açıklama ve Yorumlar odaklı)
                 const name = $$('h1').text().trim() || "Unknown";
                 // Önce tam açıklamayı (itemprop) dene, yoksa meta etiketindeki özeti al
-                const description = $$('[itemprop="description"]').text().trim() || 
+                // DÜZELTME: Meta tag yerine DIV arıyoruz
+                const description = $$('div[itemprop="description"]').text().trim() || 
+                                    $$('.C7k78').text().trim() || 
                                     $$('meta[property="og:description"]').attr('content') || 
                                     $$('.TZFoid').text() || ""; 
                 
@@ -180,7 +182,7 @@ async function analyzeWithAI(marketData, userIntent, contextInfo) {
 
     const userPrompt = `
     User Intent: "${userIntent}"
-    Here is the raw description data of the TOP 5 COMPETITORS I scraped from the store:
+    Here is the raw description data of the TOP COMPETITORS I scraped from the store:
 
     ${dataText}
 
